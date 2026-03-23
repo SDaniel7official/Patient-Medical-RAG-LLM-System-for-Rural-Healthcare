@@ -1,2 +1,3 @@
-# Patient-Medical-RAG-System
+# Patient-Medical-RAG-LLM-System-for-Rural-Healthcare
 Retrieval-Augmented Generation (RAG) system for querying patient medical history from EHR datasets. Combines semantic search, patient-level metadata filtering, and LLM-based generation to produce structured clinical reports. Designed for accurate, context-aware retrieval and efficient analysis of longitudinal patient data.
+Patient Medical RAG-LLM System designed for rural healthcare settings. Enables natural language querying of patient medical history from EHR data using semantic retrieval and strict patient-level filtering, generating structured clinical reports to support efficient and accurate decision-making in low-resource environments.
