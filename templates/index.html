@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Patient Medical History RAG System powered by Groq LLM and PubMedBERT embeddings on MIMIC-IV data.">
+    <title>Patient Medical History RAG System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-card: #111827;
+            --bg-input: #1e293b;
+            --border: #2d3a52;
+            --accent: #3b82f6;
+            --accent-glow: rgba(59,130,246,0.25);
+            --gold: #f59e0b;
+            --text-primary: #f1f5f9;
+            --text-muted: #94a3b8;
+            --success: #22c55e;
+            --danger: #ef4444;
+        }
+        * { box-sizing: border-box; }
+        body {
+            background: var(--bg-primary);
+            font-family: 'Inter', sans-serif;
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+        .app-container {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+        /* ── Header ────────────────────────────────────── */
+        .app-header {
+            text-align: center;
+            padding: 32px 0 24px;
+        }
+        .app-header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 6px;
+        }
+        .app-header .subtitle {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        .badge-model {
+            display: inline-block;
+            margin-top: 8px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            color: var(--gold);
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 4px 12px;
+            border-radius: 20px;
+            letter-spacing: 0.3px;
+        }
+        /* ── Card ──────────────────────────────────────── */
+        .card-dark {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        /* ── Input ─────────────────────────────────────── */
+        .chat-input {
+            background: var(--bg-input);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            min-height: 90px;
+            resize: vertical;
+            font-size: 0.95rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .chat-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+            background: var(--bg-input);
+            color: var(--text-primary);
+        }
+        .chat-input::placeholder { color: var(--text-muted); }
+        .input-warning { display: none; color: var(--danger); font-size: 0.82rem; margin-top: 4px; }
+        /* ── Buttons ───────────────────────────────────── */
+        .btn-primary-custom {
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            color: #fff;
+            border: none;
+            padding: 10px 22px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: opacity 0.15s, transform 0.1s;
+        }
+        .btn-primary-custom:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+        .btn-primary-custom:disabled { opacity: 0.45; cursor: not-allowed; }
+        .btn-eval {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            color: var(--gold);
+            padding: 10px 22px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: border-color 0.2s;
+        }
+        .btn-eval:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+        .btn-eval:disabled { opacity: 0.45; cursor: not-allowed; }
+        /* ── Response ──────────────────────────────────── */
+        .response-box {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 18px;
+            min-height: 60px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: 0.92rem;
+            line-height: 1.65;
+        }
+        .response-box hr { border-color: var(--border); }
+        /* ── About accordion ───────────────────────────── */
+        .accordion-button, .accordion-item {
+            background: var(--bg-input);
+            color: var(--text-muted);
+            border-color: var(--border);
+            font-size: 0.88rem;
+        }
+        .accordion-button:not(.collapsed) { background: #1a2744; color: var(--accent); }
+        .accordion-body { background: #0f1729; color: var(--text-muted); font-size: 0.85rem; line-height: 1.6; }
+        .accordion-button::after { filter: invert(0.6); }
+        /* ── Eval dashboard ────────────────────────────── */
+        .eval-dashboard { background: #0c1222; border: 1px solid var(--border); border-radius: 14px; padding: 24px; }
+        .eval-dashboard h3 { color: var(--accent); font-size: 1.15rem; font-weight: 700; }
+        .metric-pills { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+        .metric-pill {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 18px;
+            text-align: center;
+            min-width: 110px;
+        }
+        .metric-pill .label { color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        .metric-pill .value { color: var(--text-primary); font-size: 1.3rem; font-weight: 700; }
+        .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 18px; }
+        .chart-card { background: #fff; border-radius: 10px; padding: 8px; text-align: center; }
+        .chart-card img { max-height: 200px; width: 100%; object-fit: contain; }
+        .chart-card .chart-label { color: #555; font-size: 0.72rem; margin-top: 4px; }
+        /* ── Misc ──────────────────────────────────────── */
+        pre { white-space: pre-wrap; word-break: break-word; }
+        .shimmer {
+            background: linear-gradient(90deg, var(--bg-input) 25%, #253350 50%, var(--bg-input) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 6px;
+            height: 18px;
+            margin-bottom: 8px;
+        }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <!-- Header -->
+    <div class="app-header">
+        <h1>🏥 Patient Medical History RAG</h1>
+        <div class="subtitle">Retrieve and analyze patient records using AI</div>
+        <span class="badge-model">⚡ Powered by Groq · Llama 3 70B · PubMedBERT · Qdrant</span>
+    </div>
+
+    <!-- About -->
+    <div class="accordion mb-3" id="aboutAccordion">
+        <div class="accordion-item border-0 rounded">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed rounded" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#aboutBody">
+                    ℹ️ About This System
+                </button>
+            </h2>
+            <div id="aboutBody" class="accordion-collapse collapse">
+                <div class="accordion-body rounded-bottom">
+                    This system retrieves patient medical history from the <strong>MIMIC-IV</strong> dataset
+                    (MEDS format) using <strong>PubMedBERT</strong> for semantic search via <strong>Qdrant</strong>,
+                    and generates structured answers using <strong>Llama 3 70B</strong> via
+                    <strong>Groq</strong> cloud inference (~500 tokens/sec).
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Query Card -->
+    <div class="card-dark">
+        <textarea id="userInput" class="form-control chat-input"
+            placeholder="e.g. Show medical history of patient 10000032"></textarea>
+        <div class="input-warning" id="inputWarning">⚠ Please enter a query before submitting.</div>
+
+        <div class="d-flex gap-2 mt-3">
+            <button id="submitBtn" class="btn btn-primary-custom">
+                <span id="submitLabel">🔍 Query</span>
+                <span id="submitSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status"></span>
+            </button>
+            <button id="evalBtn" class="btn btn-eval">
+                <span id="evalLabel">📊 Evaluate</span>
+                <span id="evalSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status"></span>
+            </button>
+        </div>
+
+        <div id="response" class="response-box mt-3 d-none"></div>
+    </div>
+
+    <!-- Evaluation Dashboard -->
+    <div id="evalDashboard" class="eval-dashboard mt-2 d-none">
+        <h3 class="text-center mb-3">📊 Evaluation Dashboard</h3>
+        <div class="metric-pills" id="metricPills"></div>
+        <div class="chart-grid mt-3">
+            <div class="chart-card">
+                <img id="accImg" src="" alt="Accuracy Chart">
+                <div class="chart-label">Accuracy</div>
+            </div>
+            <div class="chart-card">
+                <img id="barImg" src="" alt="Metrics Bar Chart">
+                <div class="chart-label">Precision / Recall / F1</div>
+            </div>
+            <div class="chart-card">
+                <img id="cmImg" src="" alt="Confusion Matrix">
+                <div class="chart-label">Confusion Matrix</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const $ = (id) => document.getElementById(id);
+    const submitBtn   = $('submitBtn');
+    const submitLabel = $('submitLabel');
+    const submitSpinner = $('submitSpinner');
+    const evalBtn     = $('evalBtn');
+    const evalLabel   = $('evalLabel');
+    const evalSpinner = $('evalSpinner');
+    const responseBox = $('response');
+    const inputWarning = $('inputWarning');
+
+    // ── Query ──────────────────────────────────────────────────
+    submitBtn.addEventListener('click', async () => {
+        const query = $('userInput').value.trim();
+        if (!query) { inputWarning.style.display = 'block'; return; }
+        inputWarning.style.display = 'none';
+
+        submitLabel.textContent = 'Processing…';
+        submitSpinner.classList.remove('d-none');
+        submitBtn.disabled = true;
+        responseBox.classList.remove('d-none');
+        responseBox.innerHTML = '<div class="shimmer" style="width:90%"></div><div class="shimmer" style="width:70%"></div><div class="shimmer" style="width:80%"></div>';
+
+        const formData = new FormData();
+        formData.append('query', query);
+
+        try {
+            const res = await fetch('/get_response', { method: 'POST', body: formData });
+            const data = await res.json();
+
+            if (data.error) {
+                responseBox.innerHTML = `<span style="color:var(--danger)">⚠ ${data.error}</span>`;
+            } else {
+                const formatted = data.answer
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\n/g, '<br>');
+                responseBox.innerHTML = `
+                    <div>${formatted}</div>
+                    <hr>
+                    <small style="color:var(--text-muted)">Source: <strong>${data.doc}</strong></small>`;
+            }
+        } catch (err) {
+            console.error(err);
+            responseBox.innerHTML = '<span style="color:var(--danger)">⚠ Network error — check server logs.</span>';
+        } finally {
+            submitLabel.textContent = '🔍 Query';
+            submitSpinner.classList.add('d-none');
+            submitBtn.disabled = false;
+        }
+    });
+
+    // ── Evaluation ─────────────────────────────────────────────
+    evalBtn.addEventListener('click', async () => {
+        const dashboard = $('evalDashboard');
+        const pills = $('metricPills');
+
+        evalLabel.textContent = 'Evaluating…';
+        evalSpinner.classList.remove('d-none');
+        evalBtn.disabled = true;
+        dashboard.classList.remove('d-none');
+        pills.innerHTML = '<span style="color:var(--text-muted)">Running retrieval evaluation…</span>';
+
+        try {
+            const res = await fetch('/evaluate');
+            if (!res.ok) throw new Error("Evaluation failed");
+            const d = await res.json();
+
+            const metrics = [
+                { label: 'Accuracy',  value: d.accuracy },
+                { label: 'Precision', value: d.precision },
+                { label: 'Recall',    value: d.recall },
+                { label: 'F1 Score',  value: d.f1 },
+            ];
+            pills.innerHTML = metrics.map(m => `
+                <div class="metric-pill">
+                    <div class="label">${m.label}</div>
+                    <div class="value">${(m.value * 100).toFixed(1)}%</div>
+                </div>
+            `).join('');
+
+            const ts = Date.now();
+            $('accImg').src = `/static/accuracy_pie.png?t=${ts}`;
+            $('barImg').src = `/static/metrics_bar.png?t=${ts}`;
+            $('cmImg').src  = `/static/confusion_matrix.png?t=${ts}`;
+        } catch (err) {
+            console.error(err);
+            pills.innerHTML = '<span style="color:var(--danger)">⚠ Evaluation failed. Check backend logs.</span>';
+        } finally {
+            evalLabel.textContent = '📊 Evaluate';
+            evalSpinner.classList.add('d-none');
+            evalBtn.disabled = false;
+        }
+    });
+
+    // ── Ctrl+Enter to submit ───────────────────────────────────
+    $('userInput').addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.key === 'Enter') submitBtn.click();
+    });
+</script>
+</body>
+</html>
