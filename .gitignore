@@ -170,3 +170,7 @@ data/
 *.gguf
 *.crdownload
 models/
+
+# Auto-generated evaluation charts & logs
+static/*.png
+output.log
